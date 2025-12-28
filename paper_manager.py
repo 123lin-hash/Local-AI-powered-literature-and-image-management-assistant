@@ -10,7 +10,7 @@ import uuid
 import hashlib
 import torch
 
-# =================== 基础配置 ===================
+# 配置
 device = "cuda" if torch.cuda.is_available() else "cpu"
 EMBED_MODEL_PATH = "/data/linfengyun/models/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 embedder = SentenceTransformer(EMBED_MODEL_PATH, device=device)
@@ -20,14 +20,14 @@ CHROMA_DIR = "./chroma_db"
 PAPER_ROOT = "./papers"
 SORTED_ROOT = "./sorted_papers"
 
-# 主题定义（可扩展）
+# 主题定义
 TOPICS = {
     "CV": "computer vision, image understanding, object detection,image segmentation, visual representation, vision transformer, image classification, visual foundation model",
     "NLP": "natural language processing, large language model, language model, token, text generation, pretraining, instruction tuning",
     "RL": "reinforcement learning, policy optimization, reward model, preference learning, agent learning"
 }
 
-# =================== ChromaDB（持久化） ===================
+# ChromaDB
 
 client = chromadb.PersistentClient(path=CHROMA_DIR)
 collection = client.get_or_create_collection(
@@ -35,7 +35,6 @@ collection = client.get_or_create_collection(
     metadata={"hnsw:space": "cosine"}
 )
 
-# =================== SemanticChunker ===================
 
 semantic_splitter = SemanticChunker(
     embeddings,
@@ -43,7 +42,7 @@ semantic_splitter = SemanticChunker(
     breakpoint_threshold_amount=90
 )
 
-# =================== PDF 处理 ===================
+#PDF 处理
 
 def extract_pdf_text(pdf_path):
     doc = fitz.open(pdf_path)
@@ -60,7 +59,7 @@ def semantic_chunk_pdf(pdf_path):
     chunks = semantic_splitter.split_documents(docs)
     return chunks  # List[Document]
 
-# =================== 自动分类 ===================
+#自动分类
 
 def classify_text(text):
     paper_emb = embedder.encode(text, convert_to_tensor=True)
@@ -74,7 +73,7 @@ def classify_text(text):
 
     return topic_names[idx], sims[idx].item()
 
-# =================== 入库 & 自动整理 ===================
+#入库 & 自动整理
 
 def file_hash(path):
     h = hashlib.md5()
@@ -130,7 +129,7 @@ def batch_sort(pdf_dir):
             except Exception as e:
                 print(f"[失败] {file}: {e}")
 
-# =================== 语义搜索 ===================
+# 语义搜索
 
 def search_paper(query, top_k=1):
     q_emb = embedder.encode(query).tolist()
@@ -144,24 +143,5 @@ def search_paper(query, top_k=1):
     for meta in results["metadatas"][0]:
         files.append(meta["filename"])
 
-    # 文件级去重 + 保序
     return list(dict.fromkeys(files))
-
-# =================== 主入口 ===================
-
-if __name__ == "__main__":
-
-    # ---------- 单文件自动分类 ----------
-    add_paper("./papers/Attention-is-all-you-need.pdf")
-
-    # ---------- 批量一键整理 ----------
-    # batch_sort("./papers")
-
-    # ---------- 语义搜索 ----------
-    query = "什么是自注意力机制？"
-    results = search_paper(query)
-
-    print("\n最相关文献：")
-    for r in results:
-        print("-", r)
 
